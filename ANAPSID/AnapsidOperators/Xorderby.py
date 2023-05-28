@@ -19,12 +19,12 @@ data_types = {
         'dateTime' : (datetime, datetime),
         'nonPositiveInteger' : (int, 'numerical'),
         'negativeInteger' : (int, 'numerical'),
-        'long'    : (long, 'numerical'),
+        'long'    : (int, 'numerical'),
         'int'     : (int, 'numerical'),
         'short'   : (int, 'numerical'),
         'byte'    : (bytes, bytes),
         'nonNegativeInteger' : (int, 'numerical'),
-        'unsignedLong' : (long, 'numerical'),
+        'unsignedLong' : (int, 'numerical'),
         'unsignedInt'  : (int, 'numerical'),
         'unsignedShort' : (int, 'numerical'),
         'unsignedByte' : (bytes, bytes), # TODO: this is not correct
@@ -83,7 +83,7 @@ class Xorderby(object):
 
         # Handles when the literal is typed.
         if (pos > -1):
-            for t in data_types.keys():
+            for t in list(data_types.keys()):
                 if (t in val[pos]):
                     (python_type, general_type) = data_types[t]
 

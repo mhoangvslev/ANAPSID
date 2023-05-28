@@ -1,8 +1,6 @@
 import abc
 
-class _Union(object):
-    __metaclass__ = abc.ABCMeta
-
+class _Union(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def execute(self, left, right, out):
 

@@ -16,6 +16,7 @@ def getUri(p, prefs):
         n = prefs[pr]
         n = n[:-1]+su+">"
         return n
+    #print(p.name)
     return p.name
 
 def search(l, pred, prefs):
@@ -26,17 +27,18 @@ def search(l, pred, prefs):
     for (epn, epl) in l:
         if p in epl or (not pred.constant):
             r.append(epn)
+    #print(r)
 
     return r
 
 def getQuery(ts, ps):
-    q = "ASK { "
+    q = "SELECT * { "
     for t in ts:
         p = getUri(t.predicate, ps)
         s = getUri(t.subject, ps)
         o = getUri(t.theobject, ps)
         q = q + s + " " + p + " " + o + " ."
-    q = q + " }"
+    q = q + " } LIMIT 1"
     return q
 
 
@@ -46,6 +48,7 @@ def test(endpoint, triples, ps, c):
     server = endpoint[1:-1]
     q = Queue()
     b = c(server, query, q)
+    #print(b)
     return b
 
 def count(endpoint, triples, ps, c):

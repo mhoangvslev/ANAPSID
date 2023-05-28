@@ -107,8 +107,8 @@ class DependentOperator(object):
 
         # Replace in the query, the instance that is derreferenced.
         for i in range(len(variables)):
-            self.query = string.replace(self.query, "?" + variables[i], "", 1)
-            self.query = string.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
+            self.query = str.replace(self.query, "?" + variables[i], "", 1)
+            self.query = str.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
 
         # If the instance has no ?query. Example: DESCRIBE ---
         if (instances[0].find("sparql?query") == -1):
@@ -136,15 +136,15 @@ class DependentOperator(object):
     def getQueryAttributes(self):
         # Read the query from file and apply lower case.
         query = open(self.filename).read()
-        query2 = string.lower(query)
+        query2 = str.lower(query)
 
         # Extract the variables, separated by commas.
         # TODO: it supposes that there's no from clause.
-        begin = string.find(query2, "select")
+        begin = str.find(query2, "select")
         begin = begin + len("select")
-        end = string.find(query2, "where")
+        end = str.find(query2, "where")
         listatts = query[begin:end]
-        listatts = string.split(listatts, " ")
+        listatts = str.split(listatts, " ")
 
         # Iterate over the list of attributes, and delete "?".
         outlist = []

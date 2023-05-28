@@ -10,7 +10,7 @@ as Python dictionaries and are stored in queues.
 
 Last modification: December, 2013
 '''
-from __future__ import division
+
 from multiprocessing import Process, Queue, active_children
 from ANAPSID.Catalog.Catalog import Catalog
 from ANAPSID.AnapsidOperators.Xgjoin import Xgjoin
@@ -39,13 +39,14 @@ from ANAPSID.Decomposer.services import Service, Argument, Triple, Filter, Optio
 from ANAPSID.Decomposer.services import UnionBlock, JoinBlock, Query
 #from SPARQLWrapper import SPARQLWrapper, JSON, N3
 import socket
-import urllib
-import httplib
+import urllib.request, urllib.parse, urllib.error
+import http.client
 import string
 import time
 import signal
 import sys, os
 import re
+import json
 
 endpType = None
 
@@ -59,16 +60,25 @@ def contactSource(server, query, queue, buffersize=16384, limit=-1):
     cardinality = 0
     
     referer = server
-    server = server.split("http://")[1]
-    (server, path) = server.split("/", 1)
-    host_port = server.split(":")
-    port = 80 if len(host_port) == 1 else host_port[1]    
+    referer_search = re.search(r"http://(.*)/([\w\-]+/)+(\?.*)", str(referer).strip())
+    server = referer_search.group(1)
+    path = referer_search.group(2)
+    paramStr = referer_search.group(3)
     
-    #print server, path, port, query
-    #print 'limit', limit 
-    #print 'query', query
+    # server = server.split("http://")[1]
+    # (server, path) = server.split("/", 1)
+    # (path, paramStr) = path.split("?")
+    additionalParams = { k: v for k, v in re.findall(r"([\w\-]+)=(.*)", paramStr) }
+    host_port = server.split(":")
+    port = 80 if len(host_port) == 1 else host_port[1]  
+    
+    #print (referer, server, path, port, paramStr, additionalParams)
+    
+    #print(server, path, port, query)
+    #print('limit', limit)
+    #print('query', query)
     if (limit == -1):
-        b, cardinality  = contactSourceAux(referer, server, path, port, query, queue)
+        b, cardinality  = contactSourceAux(referer, server, path, port, additionalParams, query, queue)
     else:
         #Contacts the datasource (i.e. real endpoint) incrementally, 
         #retreiving partial result sets combining the SPARQL sequence
@@ -80,7 +90,7 @@ def contactSource(server, query, queue, buffersize=16384, limit=-1):
         while True:
             query_copy = query + " LIMIT " + str(limit) + " OFFSET " + str(offset)
             #print query_copy
-            b, cardinality = contactSourceAux(referer, server, path, port, query_copy, queue)
+            b, cardinality = contactSourceAux(referer, server, path, port, additionalParams, query_copy, queue)
             if (cardinality < limit):
                 break
             
@@ -91,53 +101,68 @@ def contactSource(server, query, queue, buffersize=16384, limit=-1):
     if b == None:
         queue.put("EOF")
 
+    #print(f"b: {b}")
+
     return b
 
 
         
-def contactSourceAux(referer, server, path, port, query, queue):
+def contactSourceAux(referer, server, path, port, additionalParams, query, queue):
     
     # Setting variables to return.
     b = None
     reslist = []
     
     # Formats of the response.
-    json = "application/sparql-results+json"
+    json_format = "application/sparql-results+json"
     
     # Build the query and header.
     #params = urllib.urlencode({'query': query})
-    params = urllib.urlencode({'query': query, 'format': json})
+    pattern = re.compile("SELECT \* WHERE \{.+\} LIMIT 1")
+    params_dict = dict()
+    params_dict.update(additionalParams)
+    params_dict.update({'query': query, 'format': json_format})
+        
+    params = urllib.parse.urlencode(params_dict)
     headers = {"User-Agent": "Anapsid/2.7", "Accept": "*/*", "Referer": referer, "Host": server}
-    #print params
+    #print(params)
     
     # Establish connection and get response from server.
-    conn = httplib.HTTPConnection(server)
+    conn = http.client.HTTPConnection(server)
     #conn.set_debuglevel(1)
     conn.request("GET", "/" + path + "?" + params, None, headers)
     response = conn.getresponse()
     
     #print response.status
-    if (response.status == httplib.OK):
-        res = response.read()
+    if (response.status == http.client.OK):
+        res = response.read().decode('utf-8')
         res = res.replace("false", "False")
         res = res.replace("true", "True")
         #print "raw results from endpoint", res 
         res = eval(res)
         
         if type(res) == dict:
-            b = res.get('boolean', None)
+            #print(f"res: {res}")
+            #print(f"res boolean: {len(res['results']['bindings']) > 0}")
+            #b = res.get('boolean', None)
+            if ("SELECT *" in query) and ("LIMIT 1" in query):
+                b = len(res['results']['bindings']) > 0
+            else:
+                b = None
 
             if 'results' in res:
-                #print "raw results from endpoint", res 
+                #print("raw results from endpoint", res)
                 for x in res['results']['bindings']:
-                    for key, props in x.iteritems():
+                    for key, props in x.items():
                         #Handle typed-literals and language tags
                         suffix = ''
                         if (props['type'] == 'typed-literal'):
-                            suffix = "^^<" +  props['datatype'].encode("utf-8") + ">"
+                            #suffix = "^^<" +  props['datatype'].encode("utf-8") + ">"
+                            suffix = "^^<" +  props['datatype'] + ">"
                         elif ("xml:lang" in props):
                             suffix = '@' + props['xml:lang']
-                        x[key] = props['value'].encode("utf-8") + suffix
+                        #x[key] = props['value'].encode("utf-8") + suffix
+                        x[key] = props['value'] + suffix
 
                 reslist = res['results']['bindings']
 
@@ -145,10 +170,10 @@ def contactSourceAux(referer, server, path, port, query, queue):
                 for elem in reslist:
                     #print path, elem
                     queue.put(elem)
-                #print "query", query, "endpoint", server, "cardinality", len(reslist)
+                #print("query", query, "endpoint", server, "cardinality", len(reslist))
         else:
-            print ("the source "+str(server)+" answered in "+ response.getheader("content-type")+" format, instead of"
-                    +" the JSON format required, then that answer will be ignored")
+            print(("the source "+str(server)+" answered in "+ response.getheader("content-type")+" format, instead of"
+                    +" the JSON format required, then that answer will be ignored"))
             
     return (b, len(reslist))
 
@@ -157,7 +182,7 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
     #Contacts the datasource (i.e. real endpoint).
     #Every tuple in the answer is represented as Python dictionaries
     #and is stored in a queue.
-    print "in contactSource"
+    print("in contactSource")
     if (limit == -1):
         
         # Build the query and contact the source.
@@ -167,20 +192,21 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
         try:
             res = sparql.query()
         except Exception as e:
-	    queue.put("EOF")
-            return  None
+            #print("Plan.py [196]")
+            queue.put("EOF")
+            return None
         f = res.info()["content-type"]
         
 
         res = res.convert()
         b = None
-	
+    
         if type(res) == dict:
             b = res.get('boolean', None)
             
             if 'results' in res:
                 for x in res['results']['bindings']:
-                    for key, props in x.iteritems():
+                    for key, props in x.items():
                         x[key] = props['value'].encode("utf-8")
 
                 reslist = res['results']['bindings']
@@ -191,8 +217,8 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
                     queue.put(elem)
         else:
             
-            print ("the source "+str(server)+" answered in "+f+" format, instead of"
-                   +" the JSON format required, then that answer will be ignored")
+            print(("the source "+str(server)+" answered in "+f+" format, instead of"
+                   +" the JSON format required, then that answer will be ignored"))
 
 
     #Contacts the datasource (i.e. real endpoint) incrementally, 
@@ -217,6 +243,7 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
             try:
                 res = sparql.query()
             except Exception as e:
+                #print("Plan.py [247]")
                 queue.put("EOF")
                 return  None
     
@@ -228,7 +255,7 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
                 b = res.get('boolean', None)
                 if 'results' in res:
                     for x in res['results']['bindings']:
-                        for key, props in x.iteritems():
+                        for key, props in x.items():
                             x[key] = props['value'].encode("utf-8")
 
                     reslist = res['results']['bindings']
@@ -237,8 +264,8 @@ def contactSourceOld(server, query, queue, buffersize=16384, limit=-1):
                 for elem in reslist:
                     queue.put(elem)
             else:
-                print ("the source "+str(server)+" answered in "+f+" format, instead of"
-                       +" the JSON format required, then that answer will be ignored")
+                print(("the source "+str(server)+" answered in "+f+" format, instead of"
+                       +" the JSON format required, then that answer will be ignored"))
             #print "len(res[results][bindings]", len(res['results']['bindings']) 
             if (len(res['results']['bindings']) < limit):
                 break
@@ -257,21 +284,31 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
     Every tuple in the answer is represented as Python dictionaries
     and is stored in a queue.
     '''
-    # Encode the query as an url string.
-    query = urllib.quote(query.encode('utf-8'))
-    format = urllib.quote("application/sparql-results+json".encode('utf-8'))
+    # Encode the query as an url str.
+    params = {
+        "query": urllib.parse.quote(query.encode('utf-8')),
+        "format": urllib.parse.quote("application/sparql-results+json".encode('utf-8'))
+    }
     #Get host and port from "server".
-    [http, server] = server.split("http://")
-    host_port = server.split(":")
-
-    port= host_port[1].split("/")[0]
+    # [http, server] = server.split("http://")
+    # host_port = server.split(":")
+    # port= host_port[1].split("/")[0]
+    
+    referer_search = re.search(r"http://(.*):(\d+)/([\w\-]+/)+(\?.*)", server)
+    host = referer_search.group(1)
+    port = referer_search.group(2)
+    path = referer_search.group(3)
+    paramStr = referer_search.group(4)
+    
+    additionalParams = { k: v for k, v in re.findall(r"([\w\-]+)=(.*)", paramStr) }
+    additionalParams.update(params)
 
     # Create socket, connect it to server and send the query.
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    s.connect((host_port[0], int(port)))
+    s.connect((host, int(port)))
 
-    s.send("GET /sparql/?query=" + query + "&format=" + format)
+    s.send(f"GET /sparql/?{'&'.join([f'{k}={v}' for k, v in additionalParams.items()])}".encode())
     s.shutdown(1)
 
     aux = ""
@@ -286,6 +323,7 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
       try:
         data = s.recv(buffersize)
       except Exception:
+        #print("Plan.py [327]")
         exit()
       else:
         #print "data_contactProxy: "+str(data)
@@ -314,16 +352,16 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
             p = l.find(', \"boolean\": ')
             if p >= 0 and len(l) > p + 13:
                 #print "contactProxy_l: "+str(l)
-		b = (l[p+13] == 't')
+                b = (l[p+13] == 't')
                 lb = False
         for elem in reslist:
-            pos1 = string.find(elem, "    {")
-            pos2 = string.find(elem, "}}")
+            pos1 = str.find(elem, "    {")
+            pos2 = str.find(elem, "}}")
             if ((pos1>-1) and (pos2>-1)):
                 str_t = elem[pos1:pos2+2]
                 dict_t = eval(str_t.rstrip())
                 res = {}
-                for key, props in dict_t.iteritems():
+                for key, props in dict_t.items():
                     res[key] = props['value']
                 queue.put(res)
                 aux = elem[pos2:]
@@ -348,7 +386,7 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
 #    and is stored in a queue.
 #    '''
 #
-#    # Encode the query as an url string.
+#    # Encode the query as an url str.
 #    query = urllib.quote(query.encode('utf-8'))
 #    json = "application/sparql-results+json"
 #    format = urllib.quote(json.encode('utf-8'))
@@ -434,11 +472,11 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
 #            p = l.find(', \"boolean\": ')
 #            if p >= 0 and len(l) > p + 13:
 #                #print "contactProxy_l: "+str(l)
-#		b = (l[p+13] == 't')
+#        b = (l[p+13] == 't')
 #                lb = False
 #        for elem in reslist:
-#            pos1 = string.find(elem, "    {")
-#            pos2 = string.find(elem, "}}")
+#            pos1 = str.find(elem, "    {")
+#            pos2 = str.find(elem, "}}")
 #            if ((pos1>-1) and (pos2>-1)):
 #                str_t = elem[pos1:pos2+2]
 #                dict_t = eval(str_t.rstrip())
@@ -466,7 +504,7 @@ def createPlan(query, adaptive, wc, buffersize, c, endpointType):
 
     endpType = endpointType
 
-    #print "query", query
+    #print(f"query: {query}")
     operatorTree = includePhysicalOperatorsQuery(query, adaptive, wc,
                                                  buffersize, c)
    
@@ -481,21 +519,21 @@ def createPlan(query, adaptive, wc, buffersize, c, endpointType):
     # Adds the distinct operator to the plan.
     if (query.distinct):
         operatorTree = TreePlan(Xdistinct(None), operatorTree.vars, operatorTree)
-	
+    
     # Adds the offset operator to the plan.
     if (query.offset != -1):
         operatorTree = TreePlan(Xoffset(None, query.offset), operatorTree.vars, operatorTree)
 
     # Adds the limit operator to the plan. 
     if (query.limit != -1):
-        #print "query.limit", query.limit
+        #print(f"query.limit: {query.limit}")
         operatorTree = TreePlan(Xlimit(None, query.limit), operatorTree.vars, operatorTree)
 
     # Adds the order by operator to the plan. 
     #if (len(query.order_by) > 0):
     #    operatorTree = TreePlan(Xorderby(query.order_by), operatorTree.vars, operatorTree)
 
-    #print "Physical plan:", operatorTree
+    #print(f"Physical plan: {operatorTree}")
     return operatorTree
 
 def includePhysicalOperatorsQuery(query, a, wc, buffersize, c):
@@ -504,10 +542,11 @@ def includePhysicalOperatorsQuery(query, a, wc, buffersize, c):
 
 def includePhysicalOperatorsUnionBlock(query, ub, a, wc, buffersize, c):
     r = []
-    #print "ub.triples", ub.triples
+    #print(f"===== [ub.triples:{ub.triples}] [len(r):{len(r)}] =====")
     for jb in ub.triples:
         r.append(includePhysicalOperatorsJoinBlock(query, jb,
                                                    a, wc, buffersize, c))
+    #print(f"===== [len(r):{len(r)}] =====")
     while len(r) > 1:
         left = r.pop(0)
         right = r.pop(0)
@@ -645,19 +684,20 @@ def includePhysicalOperatorJoin(a, wc, l, r):
         dependent_join = False
         #if (noInstantiatedRightStar) or ((not wc) and (l.constantPercentage() >= 0.5) and (len(join_variables) > 0) and c):
         # Case 1: left operator is highly selective and right operator is low selective
-	if not(lowSelectivityLeft) and lowSelectivityRight  and not(isinstance(r, TreePlan)):
+        #print(f"L: {l.operator.__class__.__name__} | R: {r.operator.__class__.__name__}")
+        if not(lowSelectivityLeft) and lowSelectivityRight  and not(isinstance(r, TreePlan)):
             n = TreePlan(NestedHashJoin(join_variables), all_variables, l, r)
             dependent_join = True
             #print "Planner CASE 1: nested loop", type(r)
         # Case 2: left operator is low selective and right operator is highly selective
-	elif lowSelectivityLeft and not(lowSelectivityRight) and not(isinstance(l, TreePlan)):
-	    n = TreePlan(NestedHashJoin(join_variables), all_variables, r, l)
+        elif lowSelectivityLeft and not(lowSelectivityRight) and not(isinstance(l, TreePlan)):
+            n = TreePlan(NestedHashJoin(join_variables), all_variables, r, l)
             dependent_join = True
             #print "Planner CASE 2: nested loop swapping plan", type(r)
         elif not(lowSelectivityLeft) and lowSelectivityRight  and (not(isinstance(l, TreePlan)) or not(l.operator.__class__.__name__ == "NestedHashJoinFilter" )) and (not(isinstance(r,TreePlan)) or not(r.operator.__class__.__name__ == "Xgjoin" or r.operator.__class__.__name__ == "NestedHashJoinFilter")):
             if (isinstance(r,TreePlan) and (set(l.vars) & set(r.operator.vars_left) !=set([])) and (set(l.vars) & set(r.operator.vars_right) !=set([]))):
-               n = TreePlan(NestedHashJoin(join_variables), all_variables, l, r)
-               dependent_join = True
+                n = TreePlan(NestedHashJoin(join_variables), all_variables, l, r)
+                dependent_join = True
             elif (isinstance(l,TreePlan) and (set(r.vars)& set(l.operator.vars_left) !=set([])) and   (set(r.vars)& set(l.operator.vars_right) !=set([]))):
                n = TreePlan(NestedHashJoin(join_variables), all_variables, l, r)
                dependent_join = True
@@ -666,12 +706,12 @@ def includePhysicalOperatorJoin(a, wc, l, r):
             #print "Planner case 2.5", type(r)
         # Case 3: both operators are low selective
 
-	else:
-	    n =  TreePlan(Xgjoin(join_variables), all_variables, l, r)
+    else:
+        n =  TreePlan(Xgjoin(join_variables), all_variables, l, r)
             #print "Planner CASE 3: xgjoin"
 
-	if isinstance(n.left, IndependentOperator) and isinstance(n.left.tree, Leaf):
-	    if (n.left.constantPercentage() <= 0.5) and not(n.left.tree.service.allTriplesGeneral()):
+    if isinstance(n.left, IndependentOperator) and isinstance(n.left.tree, Leaf):
+        if (n.left.constantPercentage() <= 0.5) and not(n.left.tree.service.allTriplesGeneral()):
                 n.left.tree.service.limit = 10000 # Fixed value, this can be learnt in the future 
                 #print "modifying limit left ..."   
     else:
@@ -747,8 +787,8 @@ def includePhysicalOperators(query, tree, a, wc, buffersize, c):
                       n = TreePlan(Xfilter(f),n.vars,n)
                return n
         else:
-            print "tree.service" + str(type(tree.service)) + str(tree.service)
-            print "Error Type not considered"
+            print("tree.service" + str(type(tree.service)) + str(tree.service))
+            print("Error Type not considered")
 
     elif isinstance(tree, Node):
 
@@ -764,7 +804,7 @@ def includePhysicalOperators(query, tree, a, wc, buffersize, c):
              vars_f = f.getVarsName()
              if set(n.vars) & set(vars_f) == set(vars_f):
                n = TreePlan(Xfilter(f),n.vars,n)
-        return n 
+           return n 
 
 class IndependentOperator(object):
     '''
@@ -790,7 +830,7 @@ class IndependentOperator(object):
         self.buffersize = buffersize
         self.cardinality = None
         self.joinCardinality = []
-	#self.limit = limit
+    #self.limit = limit
         #print "query in IndependentOperator", type(self.query_str), self.query_str
 
     def instantiate(self, d):
@@ -844,7 +884,7 @@ class IndependentOperator(object):
         if (self.tree.service.limit == -1) and (self.constantPercentage() <= 0.5) and not(self.tree.service.allTriplesGeneral()):
             self.tree.service.limit=10000 #TODO: Fixed value, this can be learnt in the future
                 
-	# Evaluate the independent operator.
+    # Evaluate the independent operator.
         self.q = None
         self.q = Queue()
         self.p = Process(target=self.contact,
@@ -890,6 +930,7 @@ def onSignal(s, stackframe):
       try:
         os.kill(c.pid, s)
       except OSError as ex:
+        #print("Plan.py [933]")
         continue
 
     sys.exit(s)
@@ -927,8 +968,8 @@ class DependentOperator(object):
         # ? signal.signal(12, onSignal)
         # Replace in the query, the instance that is derreferenced.
         for i in range(len(variables)):
-            self.query = string.replace(self.query, "?" + variables[i], "", 1)
-            self.query = string.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
+            self.query = str.replace(self.query, "?" + variables[i], "", 1)
+            self.query = str.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
 
 
         # If the instance has no ?query. Example: DESCRIBE ---
@@ -970,6 +1011,7 @@ class DependentOperator(object):
 
                 except ValueError:
                     # The source shouldn't be contacted.
+                    #print("Plan.py [1014]")
                     outputqueue.put(self.atts)
                     outputqueue.put("EOF")
 
@@ -977,15 +1019,15 @@ class DependentOperator(object):
     def getQueryAttributes(self):
         # Read the query from file and apply lower case.
         query = open(self.filename).read()
-        query2 = string.lower(query)
+        query2 = str.lower(query)
 
         # Extract the variables, separated by commas.
         # TODO: it supposes that there's no from clause.
-        begin = string.find(query2, "select")
+        begin = str.find(query2, "select")
         begin = begin + len("select")
-        end = string.find(query2, "where")
+        end = str.find(query2, "where")
         listatts = query[begin:end]
-        listatts = string.split(listatts, " ")
+        listatts = str.split(listatts, " ")
 
         # Iterate over the list of attributes, and delete "?".
         outlist = []
@@ -1096,7 +1138,7 @@ class TreePlan(object):
             s = s + self.right.aux(n+"  ")
         return s
 
-    def execute(self, outputqueue):
+    def execute(self, outputqueue):        
         # Evaluates the execution plan.
         if self.left: #and this.right: # This line was modified by mac in order to evaluate unary operators
             qleft  = Queue()

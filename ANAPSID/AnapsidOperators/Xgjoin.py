@@ -8,12 +8,12 @@ The intermediate results are represented as a queue.
 '''
 import signal
 from multiprocessing import Queue
-from Queue import Empty
+from queue import Empty
 from time import time
 from tempfile import NamedTemporaryFile
 from os import remove
 from ANAPSID.Operators.Join import Join
-from OperatorStructures import Record, RJTTail, FileDescriptor
+from .OperatorStructures import Record, RJTTail, FileDescriptor
 
 class Xgjoin(Join):
 
@@ -325,7 +325,7 @@ class Xgjoin(Join):
         flushTS = time()
 
         # Update file descriptor
-        if (file_descriptor.has_key(resource_to_flush)):
+        if (resource_to_flush in file_descriptor):
             lentail = file_descriptor[resource_to_flush].size
             file = open(file_descriptor[resource_to_flush].file.name, 'a')
             file_descriptor.update({resource_to_flush: FileDescriptor(file, len(tail_to_flush.records) + lentail, flushTS)})
@@ -357,7 +357,7 @@ class Xgjoin(Join):
         tail_to_flush = RJTTail([], 0)
         least_ts = float("inf")
 
-        for resource, tail in table.iteritems():
+        for resource, tail in table.items():
             resource_ts = tail.rjtProbeTS
             if ((resource_ts < least_ts) or
                 (resource_ts == least_ts and len(tail.records) > len(tail_to_flush.records))):
@@ -372,8 +372,8 @@ class Xgjoin(Join):
     def getLargestRJTs(self, i):
         # Selects the i-th largest RJT stored in secondary memory.
 
-        sizes1 = set(map(FileDescriptor.getSize, self.fileDescriptor_left.values()))
-        sizes2 = set(map(FileDescriptor.getSize, self.fileDescriptor_right.values()))
+        sizes1 = set(map(FileDescriptor.getSize, list(self.fileDescriptor_left.values())))
+        sizes2 = set(map(FileDescriptor.getSize, list(self.fileDescriptor_right.values())))
 
         sizes1 = list(sizes1)
         sizes2 = list(sizes2)
@@ -402,7 +402,7 @@ class Xgjoin(Join):
 
         largestRJTs = {}
 
-        for resource, fd in file_descriptor.iteritems():
+        for resource, fd in file_descriptor.items():
             if (fd.size == max_len):
                 largestRJTs[resource] = fd
 

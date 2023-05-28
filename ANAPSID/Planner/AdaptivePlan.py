@@ -10,10 +10,10 @@ as Python dictionaries and are stored in queues.
 
 Last modification: August, 2012
 '''
-from __future__ import division
+
 from multiprocessing import Process, Queue, active_children
 import socket
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import string
 import time
 import signal
@@ -53,7 +53,7 @@ def contactSource(server, query, queue):
 
     if type(res) == dict:
         for x in res['results']['bindings']:
-            for key, props in x.iteritems():
+            for key, props in x.items():
                 x[key] = props['value']
 
         reslist = res['results']['bindings']
@@ -62,8 +62,8 @@ def contactSource(server, query, queue):
         for elem in reslist:
             queue.put(elem)
     else:
-        print ("the source "+str(server)+" answered in "+f+" format, instead of"
-               +" the JSON format required, then that answer will be ignored")
+        print(("the source "+str(server)+" answered in "+f+" format, instead of"
+               +" the JSON format required, then that answer will be ignored"))
     #Close the queue
     queue.put("EOF")
 
@@ -73,9 +73,9 @@ def contactProxy(server, query, buffersize, queue):
     Every tuple in the answer is represented as Python dictionaries
     and is stored in a queue.
     '''
-    # Encode the query as an url string.
-    query = urllib.quote(query.encode('utf-8'))
-    format = urllib.quote("application/sparql-results+json".encode('utf-8'))
+    # Encode the query as an url str.
+    query = urllib.parse.quote(query.encode('utf-8'))
+    format = urllib.parse.quote("application/sparql-results+json".encode('utf-8'))
     #Get host and port from "server".
     [http, server] = server.split("http://")
     host_port = server.split(":")
@@ -98,7 +98,7 @@ def contactProxy(server, query, buffersize, queue):
     #Receive the rest of the messages.
     while True:
         data = s.recv(buffersize)
-        print "data_contactProxy: "+str(data)
+        print("data_contactProxy: "+str(data))
         if len(data) == 0:
             continue
         if tam == -1:
@@ -121,13 +121,13 @@ def contactProxy(server, query, buffersize, queue):
         reslist = data.split('\n')
 
         for elem in reslist:
-            pos1 = string.find(elem, "    {")
-            pos2 = string.find(elem, "}}")
+            pos1 = str.find(elem, "    {")
+            pos2 = str.find(elem, "}}")
             if ((pos1>-1) and (pos2>-1)):
                 str_t = elem[pos1:pos2+2]
                 dict_t = eval(str_t.rstrip())
                 res = {}
-                for key, props in dict_t.iteritems():
+                for key, props in dict_t.items():
                     res[key] = props['value']
                 queue.put(res)
                 aux = elem[pos2:]
@@ -210,7 +210,7 @@ def includePhysicalOperatorsJoinBlock(simulated, query, jb, a, wc, buffersize):
     elif isinstance(jb.triples, Node) or isinstance(jb.triples, Leaf):
         tl = [includePhysicalOperators(simulated, query, jb.triples, a, wc, buffersize)]
     else: # this should never be the case..
-        print "type of triples: "+str(type(jb.triples))
+        print("type of triples: "+str(type(jb.triples)))
 
     while len(tl) > 1:
         l = tl.pop(0)
@@ -257,7 +257,7 @@ def includePhysicalOperators(simulated, query, tree, a, wc, buffersize):
             return includePhysicalOperatorsUnionBlock(simulated, query,
                                                       tree.service, a, wc, buffersize)
         else:
-            print "Plan.py:258"
+            print("Plan.py:258")
 
     elif isinstance(tree, Node):
 
@@ -360,8 +360,8 @@ class IndependentOperator(object):
 def askCount(query, tree, vars):
 
     (server, query) = tree.getCount(query, vars)
-    query = urllib.quote(query.encode('utf-8'))
-    format = urllib.quote("application/sparql-results+json".encode('utf-8'))
+    query = urllib.parse.quote(query.encode('utf-8'))
+    format = urllib.parse.quote("application/sparql-results+json".encode('utf-8'))
     [http, server] = server.split("http://")
     host_port = server.split(":")
 
@@ -402,13 +402,13 @@ def askCount(query, tree, vars):
         data = aux
         reslist = data.split('\n')
         for elem in reslist:
-            pos1 = string.find(elem, "    {")
-            pos2 = string.find(elem, "}}")
+            pos1 = str.find(elem, "    {")
+            pos2 = str.find(elem, "}}")
             if ((pos1>-1) and (pos2>-1)):
                 str_t = elem[pos1:pos2+2]
                 dict_t = eval(str_t.rstrip())
                 res = {}
-                for key, props in dict_t.iteritems():
+                for key, props in dict_t.items():
                     res[key] = props['value']
                 sigue = False
                 aux = elem[pos2:]
@@ -431,6 +431,7 @@ def onSignal(s, stackframe):
       try:
         os.kill(c.pid, s)
       except OSError as ex:
+        print("AdaptivePlan.py [434]")
         continue
     sys.exit(s)
 
@@ -467,8 +468,8 @@ class DependentOperator(object):
         # ? signal.signal(12, onSignal)
         # Replace in the query, the instance that is derreferenced.
         for i in range(len(variables)):
-            self.query = string.replace(self.query, "?" + variables[i], "", 1)
-            self.query = string.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
+            self.query = str.replace(self.query, "?" + variables[i], "", 1)
+            self.query = str.replace(self.query, "?" + variables[i], "<" + instances[i] + ">")
 
         # If the instance has no ?query. Example: DESCRIBE ---
         if (instances[0].find("sparql?query") == -1):
@@ -507,6 +508,7 @@ class DependentOperator(object):
 
                 except ValueError:
                     # The source shouldn't be contacted.
+                    print("AdaptivePlan.py [511]")
                     outputqueue.put(self.atts)
                     outputqueue.put("EOF")
 
@@ -514,15 +516,15 @@ class DependentOperator(object):
     def getQueryAttributes(self):
         # Read the query from file and apply lower case.
         query = open(self.filename).read()
-        query2 = string.lower(query)
+        query2 = str.lower(query)
 
         # Extract the variables, separated by commas.
         # TODO: it supposes that there's no from clause.
-        begin = string.find(query2, "select")
+        begin = str.find(query2, "select")
         begin = begin + len("select")
-        end = string.find(query2, "where")
+        end = str.find(query2, "where")
         listatts = query[begin:end]
-        listatts = string.split(listatts, " ")
+        listatts = str.split(listatts, " ")
 
         # Iterate over the list of attributes, and delete "?".
         outlist = []

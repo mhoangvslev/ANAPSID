@@ -1,6 +1,12 @@
 #!/usr/bin/env python
+import os
+from pathlib import Path
 import sys
 from multiprocessing import Queue
+
+import sys
+sys.path.append(str(os.path.join(Path(__file__).parent.parent)))
+
 from ANAPSID.Planner.Plan import contactSource
 
 QUERY = 'select distinct ?p where { ?s ?p ?o . }'
@@ -14,9 +20,10 @@ def get_predicates(q):
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print 'Usage: %s [input-file] [output-file]' % sys.argv[0]
+        print('Usage: %s [input-file] [output-file]' % sys.argv[0])
         sys.exit(1)
     with open(sys.argv[1], 'r') as f:
+        print(sys.argv[1])
         endpoints = [x.strip() for x in f.readlines() if x]
         m = {}
         for endpoint in endpoints:
@@ -25,9 +32,9 @@ if __name__ == '__main__':
             m[endpoint] = [p for p in get_predicates(q)]
 
     result = []
-    for (k,v) in m.items():
+    for (k,v) in list(m.items()):
         s = ' '.join('<%s>' % x for x in v)
         result.append(FORMAT % (k, s))
     with open(sys.argv[2], 'w') as f:
         f.write('\n'.join(result))
-    print 'Wrote file %s. Done!' % sys.argv[2]
+    print('Wrote file %s. Done!' % sys.argv[2])

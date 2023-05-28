@@ -7,13 +7,13 @@ The intermediate results are represented as queues.
 @author: Maribel Acosta Deibe
 '''
 from multiprocessing import Queue
-from Queue import Empty
+from queue import Empty
 from tempfile import NamedTemporaryFile
 from threading import Timer
 from random import randint
 from os import remove
 from ANAPSID.Operators.Join import Join
-from OperatorStructures import Table, Partition, Record, FileDescriptor, isOverlapped
+from .OperatorStructures import Table, Partition, Record, FileDescriptor, isOverlapped
 
 class XJoin(Join):
 
@@ -152,7 +152,7 @@ class XJoin(Join):
                 file_descriptor = self.fileDescriptor_left
 
             # Check if the partition has been flushed and has records in main memory.
-            if ((file_descriptor.has_key(i)) and (len(partition.records)>0)):
+            if ((i in file_descriptor) and (len(partition.records)>0)):
                 dtsLast = 0
 
                 for record in partition.records:
@@ -271,8 +271,8 @@ class XJoin(Join):
     def probeSecondarySecondaryMem(self, filedescriptor1, filedescriptor2):
         # Probe partitions in secondary memory.
 
-        for partition in filedescriptor1.keys():
-            if (filedescriptor2.has_key(partition)):
+        for partition in list(filedescriptor1.keys()):
+            if (partition in filedescriptor2):
                 file1 = open(filedescriptor1[partition].file.name, 'r')
                 records1 = file1.readlines()
                 timestamps1 = filedescriptor1[partition].timestamps
@@ -359,7 +359,7 @@ class XJoin(Join):
             self.right_table.partitions[victim] = Partition()
 
         # Update file descriptor
-        if (file_descriptor.has_key(victim)):
+        if (victim in file_descriptor):
             lenfile = file_descriptor[victim].size
             file = open(file_descriptor[victim].file.name, 'a')
             file_descriptor.update({victim: FileDescriptor(file, len(partition_to_flush.records) + lenfile, file_descriptor[victim].timestamps)})

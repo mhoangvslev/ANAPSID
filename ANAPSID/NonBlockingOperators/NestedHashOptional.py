@@ -8,12 +8,12 @@ Autor: Gabriela Montoya
 Date: November 18th, 2013
 
 '''
-from OperatorStructures import Table, Partition, Record
+from .OperatorStructures import Table, Partition, Record
 from multiprocessing import Queue, Process
 from time import time
 from ANAPSID.Decomposer.Tree import Leaf, Node
 import string, sys
-from Queue import Empty
+from queue import Empty
 from ANAPSID.Operators.Optional import Optional
 
 class NestedHashOptional(Optional):
@@ -126,7 +126,7 @@ class NestedHashOptional(Optional):
         d = {}
         for var in self.vars:
             v = tuple[var]
-            if string.find(v, "http") == 0: # uris must be passed between < .. >
+            if str.find(v, "http") == 0: # uris must be passed between < .. >
                 v = "<"+v+">"
             else:
                 v = '"'+v+'"'

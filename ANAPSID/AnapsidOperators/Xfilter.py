@@ -24,7 +24,7 @@ logical_connectives = {
 
 arithmetic_operators = {
         '*'  : operator.mul,
-        '/'  : operator.div,
+        '/'  : operator.truediv,
         '+'  : operator.add,
         '-'  : operator.sub, 
          }
@@ -48,19 +48,19 @@ data_types = {
         'dateTime' : (datetime, datetime),
         'nonPositiveInteger' : (int, 'numerical'),
         'negativeInteger' : (int, 'numerical'),
-        'long'    : (long, 'numerical'),
+        'long'    : (int, 'numerical'),
         'int'     : (int, 'numerical'),
         'short'   : (int, 'numerical'),
         'byte'    : (bytes, bytes),
         'nonNegativeInteger' : (int, 'numerical'),
-        'unsignedLong' : (long, 'numerical'),
+        'unsignedLong' : (int, 'numerical'),
         'unsignedInt'  : (int, 'numerical'),
         'unsignedShort' : (int, 'numerical'),
         'unsignedByte' : (bytes, bytes), # TODO: this is not correct
         'positiveInteger' : (int, 'numerical')
         }
 
-numerical = (int, long, float)
+numerical = (int, int, float)
 
 class Xfilter(object):
     
@@ -113,9 +113,11 @@ class Xfilter(object):
             
     
     # Inductive case.
-    def evaluateComplexExpression(self, tuple, operator, (expr_left,type_left), (expr_right,type_right)):
+    def evaluateComplexExpression(self, tuple, operator, xxx_todo_changeme, xxx_todo_changeme1):
         
         # Case 1: Inductive case binary operator OP(Expr, Expr)
+        (expr_left,type_left) = xxx_todo_changeme
+        (expr_right,type_right) = xxx_todo_changeme1
         if isinstance(expr_left, Expression) and isinstance(expr_right, Expression):
             #print "Case 1"
             res_left = self.evaluateComplexExpression(tuple, expr_left.op, 
@@ -214,8 +216,9 @@ class Xfilter(object):
         return (False, None)
     
     
-    def evaluateUnaryOperator(self, tuple, operator, (expr_left, type_left)):
+    def evaluateUnaryOperator(self, tuple, operator, xxx_todo_changeme2):
  
+        (expr_left, type_left) = xxx_todo_changeme2
         if (operator == '+' and isinstance(expr_left, numerical)):
             return (expr_left, type_left)
  
@@ -232,8 +235,10 @@ class Xfilter(object):
             raise SPARQLTypeError
     
     
-    def evaluateLogicalConnective(self, operator, (expr_left, type_left), (expr_right, type_right)):
+    def evaluateLogicalConnective(self, operator, xxx_todo_changeme3, xxx_todo_changeme4):
 
+        (expr_left, type_left) = xxx_todo_changeme3
+        (expr_right, type_right) = xxx_todo_changeme4
         (isEBV_left, ebv_left) = self.evaluateEBV(expr_left, type_left)
         (isEBV_right, ebv_right) = self.evaluateEBV(expr_right, type_right)
 
@@ -257,18 +262,22 @@ class Xfilter(object):
             else:
                 return (res, bool)
     
-    def evaluateTest(self, operator, (expr_left, type_left), (expr_right, type_right)):
+    def evaluateTest(self, operator, xxx_todo_changeme5, xxx_todo_changeme6):
                 
+        (expr_left, type_left) = xxx_todo_changeme5
+        (expr_right, type_right) = xxx_todo_changeme6
         if ((type(expr_left) == type(expr_right)) or (isinstance(expr_left, numerical) and isinstance(expr_right, numerical))):
             #print "Here", val_left, type_left, val_right, type_right
             return (test_operators[operator](expr_left, expr_right), bool)
         else:
-            print "SPARQLTypeError"
+            print("SPARQLTypeError")
             raise SPARQLTypeError
     
     
-    def evaluateAritmethic(self, operator, (expr_left, type_left), (expr_right, type_right)):
+    def evaluateAritmethic(self, operator, xxx_todo_changeme7, xxx_todo_changeme8):
         
+        (expr_left, type_left) = xxx_todo_changeme7
+        (expr_right, type_right) = xxx_todo_changeme8
         if (isinstance(expr_left, numerical) and isinstance(expr_right, numerical)):
             return (arithmetic_operators[operator](expr_left, expr_right), type_left) # TODO: implement the cases with types
         else:
@@ -280,13 +289,13 @@ class Xfilter(object):
     
         # Handles when the literal is typed.
         if (pos > -1):
-            for t in data_types.keys():
+            for t in list(data_types.keys()):
                 if (t in val[pos]):
                     (python_type, general_type) = data_types[t]
 
                     if (general_type == bool):
                         return (val[:pos], general_type)
-	
+    
                     else:
                         return( python_type(val[:pos]), general_type)
             

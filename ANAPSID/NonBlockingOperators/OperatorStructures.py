@@ -40,7 +40,7 @@ class Table(object):
     '''
     def __init__(self):
         self.size = 1
-        self.partitions = [Partition() for x in xrange(self.size)]
+        self.partitions = [Partition() for x in range(self.size)]
 
     def getSize(self):
         return self.size
@@ -80,13 +80,19 @@ class FileDescriptor(object):
 #        self.probeTS = probeTS
     
     
-def isOverlapped((x1,x2), (y1,y2)):
+def isOverlapped(xxx_todo_changeme, xxx_todo_changeme1):
+    (x1,x2) = xxx_todo_changeme
+    (y1,y2) = xxx_todo_changeme1
     return (partiallyOverlapped((x1,x2), (y1,y2)) or
             fullyOverlapped((x1,x2), (y1,y2)))
     
-def partiallyOverlapped((x1,x2), (y1,y2)):
+def partiallyOverlapped(xxx_todo_changeme2, xxx_todo_changeme3):
+    (x1,x2) = xxx_todo_changeme2
+    (y1,y2) = xxx_todo_changeme3
     return ((x1 <= y1 <= x2 <= y2) or (y1 <= x1 <= y2 <= x2))
             
-def fullyOverlapped((x1,x2), (y1,y2)):
+def fullyOverlapped(xxx_todo_changeme4, xxx_todo_changeme5):
+    (x1,x2) = xxx_todo_changeme4
+    (y1,y2) = xxx_todo_changeme5
     return ((x1 <= y1 <= y2 <= x2) or (y1 <= x1 <= x2 <= y2))
         

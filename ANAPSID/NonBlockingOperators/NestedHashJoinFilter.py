@@ -13,10 +13,10 @@ Date: January 29th, 2014
 from multiprocessing import Queue, Process
 from time import time
 import string, sys
-from Queue import Empty
+from queue import Empty
 from ANAPSID.Operators.Join import Join
 from ANAPSID.Decomposer.Tree import Leaf, Node
-from OperatorStructures import Table, Partition, Record
+from .OperatorStructures import Table, Partition, Record
 
 
 WINDOW_SIZE = 10
@@ -146,7 +146,7 @@ class NestedHashJoinFilter(Join):
                 for var in self.vars:
                     #aux = "?" + var + "==" + tuple[var]
                     v = tuple[var]
-                    if string.find(v, "http") == 0: # uris must be passed between < .. >
+                    if str.find(v, "http") == 0: # uris must be passed between < .. >
                         v = "<"+v+">"
                     else:
                         v = '"'+v+'"'
@@ -164,7 +164,7 @@ class NestedHashJoinFilter(Join):
         #    expr = []
         #    for tuple in filter_bag:
         #        v = tuple[list(self.vars)[0]]
-        #        if string.find(v, "http") == 0: # uris must be passed between < .. >
+        #        if str.find(v, "http") == 0: # uris must be passed between < .. >
         #            v = "<"+v+">"
         #        expr.append(v)
         #    filter_str = filter_str.replace('__expr__', ' , '.join(expr))

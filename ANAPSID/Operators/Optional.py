@@ -1,8 +1,6 @@
 import abc
 
-class Optional(object):
-    __metaclass__ = abc.ABCMeta
-
+class Optional(object, metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def execute(self, left, right, out):
 
