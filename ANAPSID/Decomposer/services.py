@@ -1,5 +1,6 @@
-from __future__ import division
-from Tree import Node, Leaf
+
+import re
+from .Tree import Node, Leaf
 import string
 import os
 
@@ -7,13 +8,26 @@ class Service(object):
 
     def __init__(self, endpoint, triples, limit=-1, filter_nested=[]):
         endpoint = endpoint[1:len(endpoint)-1]
-        self.endpoint = endpoint
+        self.endpoint = self.get_docker_internal(endpoint)
         self.triples = triples
         self.filters = []    
         self.filter_nested = filter_nested# TODO: this is used to store the filters from NestedLoop operators
         self.limit = limit  # TODO: This arg was added in order to integrate contactSource with incremental calls (16/12/2013)
-        #self.filters_vars = set(filter_vars)
+        #self.filters_vars = set(filter_vars) 
+        
+    def get_docker_internal(self, endpoint):
+        """ FedShop: since the endpoints are hosted in docker container that 
+        links external port 12345 to internal 8890, when evaluate using 
+        SERVICE <http://localhost:12345/sparql> will give HTTP error.
+        Should use <http://localhost:8890/sparql> instead   
 
+        Args:
+            endpoint (_type_): _description_
+        """
+        
+        return re.sub(r"localhost:\d+", "localhost:8890", endpoint)
+        
+        
     def include_filter(self, f):
         self.filters.append(f)
 
@@ -691,6 +705,8 @@ unaryFunctor = {
     'str',
     'UCASE',
     'ucase',
+    'LCASE',
+    'lcase',
     'LANG',
     'lang',
     'DATATYPE',

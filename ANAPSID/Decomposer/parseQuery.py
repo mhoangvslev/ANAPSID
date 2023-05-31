@@ -1,6 +1,6 @@
 from ply import lex, yacc
 
-from services import Query, Argument, Triple, UnionBlock, JoinBlock, Optional, Filter, Expression
+from .services import Query, Argument, Triple, UnionBlock, JoinBlock, Optional, Filter, Expression
 
 # Lexer
 
@@ -31,8 +31,7 @@ reserved = {
     'STR': 'STR',
     'UCASE' : 'UCASE',
     'LCASE' : 'LCASE',
-    'CONTAINS' : 'CONTAINS',
-    'UPPERCASE': 'UPPERCASE'
+    'CONTAINS' : 'CONTAINS'
 }
 
 tokens = [
@@ -93,7 +92,8 @@ def t_ID(t):
     return t
 
 
-t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^\w+))?" 
+#t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^\w+))?" 
+t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^[^\"\'\n\r]+))?" 
 t_NUMBER = r"([0-9])+"
 t_VARIABLE = r"([\?]|[\$])([A-Z]|[a-z])\w*"
 t_LKEY = r"\{"
@@ -758,9 +758,9 @@ def p_unary_7(p):
 
 def p_unary_8(p):
     """
-    unary_func : UPPERCASE
+    express_arg : UCASE LPAR express_arg RPAR
     """
-    p[0] = p[1]
+    p[0] = Expression("UCASE",p[3],None)
 
 def p_unary_9(p):
     """
@@ -800,15 +800,9 @@ def p_unary_11(p):
 
 def p_unary_12(p):
     """
-    unary_func : UCASE
+    express_arg : LCASE LPAR express_arg RPAR
     """
-    p[0] = p[1]
-
-def p_unary_13(p):
-    """
-    unary_func : LCASE
-    """
-    p[0] = p[1]
+    p[0] = Expression("LCASE",p[3],None)
 
 def p_var_list(p):
     """
@@ -836,10 +830,10 @@ def p_predicate_rdftype(p):
         value = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>'
         p[0] = Argument(value,True)
     else:
-        print 'raising'
+        print('raising')
         p_error(p[1])
         raise SyntaxError
-        print '...'
+        print('...')
 
 def p_predicate_uri(p):
     """
@@ -885,11 +879,11 @@ def p_object_constant(p):
     p[0] = Argument(p[1], True)
 
 def p_error(p):
-	print p
-	if isinstance(p, str): 
-		value = p
-	else:
-		value = p.value
+    print(p)
+    if isinstance(p, str): 
+        value = p
+    else:
+        value = p.value
         raise TypeError("unknown text at %r" % (value,))
 
 parser = yacc.yacc(debug=0)

@@ -1,6 +1,6 @@
 from ply import lex, yacc
 
-from services import Query, Argument, Triple, UnionBlock, JoinBlock, Optional, Filter, Expression, Service
+from .services import Query, Argument, Triple, UnionBlock, JoinBlock, Optional, Filter, Expression, Service
 
 # Lexer
 
@@ -30,7 +30,8 @@ reserved = {
     'SAMETERM': 'SAMETERM',
     'LANGMATCHES': 'LANGMATCHES',
     'STR': 'STR',
-    'UPPERCASE': 'UPPERCASE'
+    'UCASE': 'UCASE',
+    'LCASE': 'LCASE'
 }
 
 tokens = [
@@ -86,7 +87,8 @@ def t_ID(t):
     t.type = reserved.get(t.value.upper(),'ID')    # Check for reserved words
     return t
 
-t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^\w+))?"
+#t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^\w+))?" 
+t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^[^\"\'\n\r]+))?" 
 #t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')(@[a-z][a-z])?" # According to ISO 639-1, lang tags are specified with two letters.
 #t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')(@en)?"
 #t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')"
@@ -400,7 +402,7 @@ def p_bgp_service_3(p):
     """
     bgp_service : FILTER express_rel 
     """
-    p[0] = Filter(p[2])
+    p[0] = Filter(Expression(p[2]))
 
 def p_bgp_service_4(p):
     """
@@ -863,9 +865,9 @@ def p_unary_7(p):
     p[0] = "STR"
 def p_unary_8(p):
     """
-    unary_func : UPPERCASE
+    express_arg : UCASE LPAR express_arg RPAR
     """
-    p[0] = "UPPERCASE"
+    p[0] = Expression("UCASE",p[3],None)
 
 def p_unary_9(p):
     """
@@ -903,19 +905,25 @@ def p_unary_11(p):
     """
     p[0] = p[1]
 
+def p_unary_12(p):
+    """
+    express_arg : LCASE LPAR express_arg RPAR
+    """
+    p[0] = Expression("LCASE",p[3],None)
+
 def p_predicate_rdftype(p):
     """
     predicate : ID
     """
     if  p[1] == 'a':
         value = '<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>'
-        print 'value set'
+        print('value set')
         p[0] = Argument(value,True)
     else:
-        print 'raising'
+        print('raising')
         p_error(p[1])
         raise SyntaxError
-        print '...'
+        print('...')
 
 def p_predicate_uri(p):
     """
