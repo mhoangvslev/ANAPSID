@@ -196,7 +196,7 @@ def usage():
                  +"(y is for showing the plan, and c is for decomposicion "
                  +"without using service operator, and using UNION to indicate "
                  +"joins.\n")
-    print(usage_str.format(program = sys.argv[0]), end=' ')
+    print(usage_str.format(program = sys.argv[0]))
 
 def get_options(argv):
     try:
@@ -306,8 +306,9 @@ def main(argv):
                     pexec.write(str(timefinal))
     except Exception as ex:
        print(str(ex))
-       with open(f"{Path(printExecTime).parent}/error.txt", "w+") as error:
-           error.write(change_case(str(type(ex)).replace("<class ","").replace(">","").replace("'","")))
+       with open(str(Path(printExecTime).parent) + "/error.txt", "w+") as error:
+           #error.write(change_case(str(type(ex)).replace("<class ","").replace(">","").replace("'","")))
+           error.write(change_case(re.sub("'>", "", re.sub("<type 'exceptions\.","",str(type(ex))))))
            raise RuntimeError
 
 if __name__ == '__main__':

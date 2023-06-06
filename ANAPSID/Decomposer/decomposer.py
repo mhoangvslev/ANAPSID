@@ -4,9 +4,9 @@ import collections
 import string
 import logging
 import os
-import urllib.request, urllib.parse, urllib.error
+import urllib
 import socket
-from . import parseEndpoints, parseQuery, parseQuery1_1, services
+import parseEndpoints, parseQuery, parseQuery1_1, services
 from . import Tree
 from itertools import combinations, permutations
 from multiprocessing import Queue

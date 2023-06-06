@@ -39,8 +39,8 @@ from ANAPSID.Decomposer.services import Service, Argument, Triple, Filter, Optio
 from ANAPSID.Decomposer.services import UnionBlock, JoinBlock, Query
 #from SPARQLWrapper import SPARQLWrapper, JSON, N3
 import socket
-import urllib.request, urllib.parse, urllib.error
-import http.client
+import urllib
+import httplib
 import string
 import time
 import signal
@@ -120,18 +120,18 @@ def contactSourceAux(referer, server, path, port, additionalParams, query, queue
     params_dict.update(additionalParams)
     params_dict.update({'query': query, 'format': json_format})
         
-    params = urllib.parse.urlencode(params_dict)
+    params = urllib.urlencode(params_dict)
     headers = {"User-Agent": "Anapsid/2.7", "Accept": "*/*", "Referer": referer, "Host": server}
     #print(params)
     
     # Establish connection and get response from server.
-    conn = http.client.HTTPConnection(server)
+    conn = httplib.HTTPConnection(server)
     #conn.set_debuglevel(1)
     conn.request("GET", "/" + path + "?" + params, None, headers)
     response = conn.getresponse()
     
     #print response.status
-    if (response.status == http.client.OK):
+    if (response.status == httplib.OK):
         res = response.read().decode('utf-8')
         res = res.replace("false", "False")
         res = res.replace("true", "True")
@@ -281,8 +281,8 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
     '''
     # Encode the query as an url str.
     params = {
-        "query": urllib.parse.quote(query.encode('utf-8')),
-        "format": urllib.parse.quote("application/sparql-results+json".encode('utf-8'))
+        "query": urllib.quote(query.encode('utf-8')),
+        "format": urllib.quote("application/sparql-results+json".encode('utf-8'))
     }
     #Get host and port from "server".
     # [http, server] = server.split("http://")
@@ -303,7 +303,7 @@ def contactProxy(server, query, queue, buffersize=16384, limit=50):
 
     s.connect((host, int(port)))
 
-    s.send(f"GET /sparql/?{'&'.join([f'{k}={v}' for k, v in additionalParams.items()])}".encode())
+    s.send("GET /sparql/?" + '&'.join([k+'='+v for k, v in additionalParams.items()]).encode())
     s.shutdown(1)
 
     aux = ""
