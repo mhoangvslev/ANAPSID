@@ -33,3 +33,8 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+summaries/
+*.out
+parsetab.py
+*bak
+*.log

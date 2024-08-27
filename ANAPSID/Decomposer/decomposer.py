@@ -14,6 +14,7 @@ from ANAPSID.Planner.Plan import contactProxy
 from Tree import Node, Leaf
 from utils import *
 from services import Service, Argument, Triple, Filter, Optional, UnionBlock, JoinBlock, Query
+from time import time
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -24,18 +25,18 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
-def decomposeQuery (l, q, d, c):
+def decomposeQuery (l, q, d, c, printAsk, printSourceSelection):
     genPred = readGeneralPredicates(os.path.join(os.path.split(os.path.split(__file__)[0])[0],
                                                                'Catalog','generalPredicates'))
     prefixes = getPrefs(q.prefs)
     #print "ln" + str(q.body) + str(type(q.body))
-    return decomposeUnionBlock(q.body, l, genPred, prefixes, d, c)
+    return decomposeUnionBlock(q.body, l, genPred, prefixes, d, c, printAsk, printSourceSelection)
 
-def decomposeUnionBlock(ub, l, genPred, prefixes, decomposition, c):
+def decomposeUnionBlock(ub, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection):
 
     r = []
     for jb in ub.triples:
-        pjb = decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c)
+        pjb = decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection)
         if pjb:
             r.append(pjb)
     if r:
@@ -43,7 +44,7 @@ def decomposeUnionBlock(ub, l, genPred, prefixes, decomposition, c):
     else:
         return None
 
-def decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c):
+def decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection):
     # jb == joinblock
     # l == list de endpoints
     tl = []
@@ -57,19 +58,19 @@ def decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c):
         elif isinstance(bgp, Filter):
             fl.append(bgp)
         elif isinstance(bgp, Optional):
-            sl.append(Optional(decomposeUnionBlock(bgp.bgg, l, genPred, prefixes, decomposition, c)))
+            sl.append(Optional(decomposeUnionBlock(bgp.bgg, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection)))
         elif isinstance(bgp, UnionBlock):
-            pub = decomposeUnionBlock(bgp, l, genPred, prefixes, decomposition, c)
+            pub = decomposeUnionBlock(bgp, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection)
             if pub:
                 sl.append(pub)
         elif isinstance(bgp, JoinBlock):
-            pub = decomposeJoinBlock(bgp, l, genPred, prefixes, decomposition, c)
+            pub = decomposeJoinBlock(bgp, l, genPred, prefixes, decomposition, c, printAsk, printSourceSelection)
             if pub:
                 sl.append(pub)
     #print 'fl'
     #print fl 
     if tl:
-        gs = getGroups(l, tl, genPred, prefixes, decomposition, c)
+        gs = getGroups(l, tl, genPred, prefixes, decomposition, c, printAsk, printSourceSelection)
         #print 'gs'
         #print gs
         if gs:
@@ -94,7 +95,7 @@ def decomposeJoinBlock(jb, l, genPred, prefixes, decomposition, c):
 def updateFilters(node,filters):
    return UnionBlock(node.triples,filters)
 
-def getGroups(l, tl, genPred, prefixes, decomposition, c):
+def getGroups(l, tl, genPred, prefixes, decomposition, c, printAsk, printSourceSelection):
 
     if decomposition == "EG":
         (g, f) = getExclusiveGroups(l, tl, prefixes)
@@ -106,14 +107,14 @@ def getGroups(l, tl, genPred, prefixes, decomposition, c):
         elif f:
             return f
     elif decomposition == "SSGS":
-        r = getStarsS(l, tl, genPred, prefixes, c)
+        r = getStarsS(l, tl, genPred, prefixes, c, printAsk, printSourceSelection)
         # print r
         if r:
             return [r]
         else:
             return r
     elif decomposition == "SSGM":
-        (g, f) = getStarsM(l, tl, genPred, prefixes, c)
+        (g, f) = getStarsM(l, tl, genPred, prefixes, c, printAsk, printSourceSelection)
         if g and f:
             f.insert(0, g)
             return f
@@ -177,10 +178,10 @@ def includeFilterAux(f, sl):
     for s in sl:
       vars_s = set()
       for t in s.triples:
-        print "t" + str(t)   
+        #print("t" + str(t))   
         vars_s.update(set(getVars(t)))
       vars_f = f.getVars()
-      print "vars_f" +str(vars_f)
+      #print("vars_f" +str(vars_f))
       if set(vars_s) & set(vars_f) == set(vars_f):
          s.include_filter(f)
          fl1=fl1 + [f]
@@ -258,8 +259,8 @@ def shareNS(p, c):
 
 def nameSpace(uri):
 
-    tail = string.lstrip(uri, "<http://")
-    pos = string.find(tail, "/")
+    tail = str.lstrip(uri, "<http://")
+    pos = str.find(tail, "/")
     return tail[0:pos]
 
 def readGeneralPredicates(fileName):
@@ -268,7 +269,7 @@ def readGeneralPredicates(fileName):
     l = []
     l0 = f.readline()
     while not l0 == '':
-        l0 = string.rstrip(l0, '\n')
+        l0 = str.rstrip(l0, '\n')
         l.append(l0)
         l0 = f.readline()
     f.close()
@@ -364,6 +365,7 @@ def getEndpoints(ps, at):
         for ep in at:
             if t in at[ep]:
                 r.append(ep)
+    #print(r)
     return r
 
 def getMostCommon(es):
@@ -384,7 +386,7 @@ def relevant(ls, pred, gps,prefs):
     return sns >= gns*0.5
 
 def isURI(name):
-    return string.find(name, '<http://') == 0 and string.rfind(name, '>') == len(name)-1
+    return str.find(name, '<http://') == 0 and str.rfind(name, '>') == len(name)-1
 
 def getPrefs(ps):
     prefDict = dict()
@@ -416,9 +418,10 @@ def assignEndpoint2(tl, l, prefixes):
             qcl0[p].append(sg)
         else:
             qcl1[sg].extend(eps0)
+    #print(qcl0, qcl1)
     return (qcl0, qcl1)
 
-def assignEndpointS(tl, l, genPred, prefixes, c):
+def assignEndpointS(tl, l, genPred, prefixes, c, printAsk, printSourceSelection):
 
     qcl = collections.defaultdict(list)
     ts = list(tl)
@@ -491,18 +494,19 @@ def assignEndpointS(tl, l, genPred, prefixes, c):
             ps = ps3
         else:
             ps.extend(ps3)
-        p = selectCurrentBest(ps, sg, qcl, prefixes, genPred, c)
+        p = selectCurrentBest(ps, sg, qcl, prefixes, genPred, c, printAsk, printSourceSelection)
         if len(p) == 0:
-            print "there are no options for " + tr(sg.predicate)
-            print "triples "+str(tl)
-            print "ps: "+str(ps)
-            print "qcl: "+str(qcl)
-            print "c: "+str(c)
+            print("there are no options for " + str(sg.predicate))
+            print("triples "+str(tl))
+            print("ps: "+str(ps))
+            print("qcl: "+str(qcl))
+            print("c: "+str(c))
         p = p[0]
         qcl[p].append(sg)
+    #print(qcl)
     return qcl
 
-def assignEndpointM(tl, l, genPred, prefixes, c):
+def assignEndpointM(tl, l, genPred, prefixes, c, printAsk, printSourceSelection):
     qcl0 = collections.defaultdict(list)
     qcl1 = collections.defaultdict(list)
     ts = list(tl)
@@ -541,7 +545,7 @@ def assignEndpointM(tl, l, genPred, prefixes, c):
            ps = ps3
         else:
            ps.extend(ps3)
-        p = selectCurrentBest(ps, sg, qcl0, prefixes, genPred, c)
+        p = selectCurrentBest(ps, sg, qcl0, prefixes, genPred, c, printAsk, printSourceSelection)
         if len(p) == 1:
              p = p[0]
              qcl0[p].append(sg)
@@ -550,12 +554,15 @@ def assignEndpointM(tl, l, genPred, prefixes, c):
              qcl0[p].append(sg)
         else:
              qcl1[sg].extend(p)
+    #print(qcl0, qcl1)
     return (qcl0, qcl1)
 
-def selectCurrentBest(options, triple, qcl, ps, genPred, c):
+def selectCurrentBest(options, triple, qcl, ps, genPred, c, printAsk, printSourceSelection):
 
     added = False
     currentOptions = []
+    nbAsk = 0
+    sourceSelection = []
     for ep in qcl:
        if ep in options:
            nl = list(qcl[ep])
@@ -564,27 +571,36 @@ def selectCurrentBest(options, triple, qcl, ps, genPred, c):
                if test(ep, nl, ps, c):
                    currentOptions.append(ep)
                    added = True
+                   sourceSelection.append([ep, nl])
+               nbAsk=+1
     if not added or not (getUri(triple.predicate, ps) in genPred or not triple.predicate.constant):
-      for ep in options:
-       nl = [triple]
-       #Avoid ask's of non-instantiated triple patterns
-       if not(triple.subject.constant or triple.predicate.constant or triple.theobject.constant) and not ep in currentOptions:
-       #    print triple.subject.name, triple.predicate.name, triple.theobject.name
-           currentOptions.append(ep)
-       elif test(ep, nl, ps, c) and not ep in currentOptions:
-           #print "yes"
-           currentOptions.append(ep)
+        for ep in options:
+            nl = [triple]
+            #Avoid ask's of non-instantiated triple patterns
+            if not(triple.subject.constant or triple.predicate.constant or triple.theobject.constant) and not ep in currentOptions:
+                #    print triple.subject.name, triple.predicate.name, triple.theobject.name
+                currentOptions.append(ep)
+            else:
+                if test(ep, nl, ps, c) and not ep in currentOptions:
+                    #print "yes"
+                    currentOptions.append(ep)
+                    sourceSelection.append([ep, nl])
+                nbAsk+=1
+    with open(printAsk, 'a') as pa:
+        pa.write('+'+str(nbAsk))
+    with open(printSourceSelection, 'a') as pss:
+        pss.write('+'+str(sourceSelection)+'\n')
     return currentOptions
 
 def getQuery(ts, ps):
 
-    q = "ASK { "
+    q = "SELECT * { "
     for t in ts:
         p = getUri(t.predicate, ps)
         s = getUri(t.subject, ps)
         o = getUri(t.theobject, ps)
         q = q + s + " " + p + " " + o + " ."
-    q = q + " }"
+    q = q + " } LIMIT 1"
     return q
 
 # def test(endpoint, triples, ps, c):
@@ -610,9 +626,9 @@ def getExclusiveGroups(l, tl, prefixes):
         views1 = views1 + [ub]
     return (views0, views1)
 
-def getStarsS(l, tl, genPred, prefixes, c):
+def getStarsS(l, tl, genPred, prefixes, c, printAsk, printSourceSelection):
 
-    qcl = assignEndpointS(tl, l, genPred, prefixes, c)
+    qcl = assignEndpointS(tl, l, genPred, prefixes, c, printAsk, printSourceSelection)
     views = []
     for cl in qcl:
         l0 = qcl[cl]
@@ -621,8 +637,8 @@ def getStarsS(l, tl, genPred, prefixes, c):
         views = views + serv
     return postp2(views)
 
-def getStarsM(l, tl, genPred, prefixes, c):
-    (qcl0, qcl1) = assignEndpointM(tl, l, genPred, prefixes, c)
+def getStarsM(l, tl, genPred, prefixes, c, printAsk, printSourceSelection):
+    (qcl0, qcl1) = assignEndpointM(tl, l, genPred, prefixes, c, printAsk, printSourceSelection)
     views0 = []
     views1 = []
     #print qcl0
@@ -844,12 +860,18 @@ def subList(a, b):
     return True
 ###############################################################################
 
-def decompose(qString, eFile, decomposition, contact):
+def decompose(qString, eFile, decomposition, contact, printAsk, printSourceSelection, printSourceSelectionTime):
 
     with open(eFile) as efile:
         endpointList = parseEndpoints.parse(efile)
+    #print(endpointList)
     query = parseQuery.parse(qString)
-    groups = decomposeQuery (endpointList, query, decomposition, contact)
+    sst1 = time()
+    groups = decomposeQuery (endpointList, query, decomposition, contact, printAsk, printSourceSelection)
+    sst2 = time() - sst1
+    with open(printSourceSelectionTime, 'w+') as psst:
+        psst.write(str(sst2))
+
     if groups == None:
         return None
     if groups == []:
@@ -874,14 +896,14 @@ def makeLeftLinealTree(ls):
 
     return Tree.makeLLTree(ls)
 
-def makePlan(qString, eFile, decomposition, plan, contact):
-    q = decompose(qString, eFile, decomposition, contact)
+def makePlan(qString, eFile, decomposition, plan, contact, printAsk, printSourceSelection, printSourceSelectionTime):
+    q = decompose(qString, eFile, decomposition, contact, printAsk, printSourceSelection, printSourceSelectionTime)
     if (q == None):
-      return None
+        return None
     q.body = makePlanQuery(q, plan)
     return q
 
-def makePlan2(qString, plan):
+def makePlan2(qString, plan, printAsk, printSourceSelection, printSourceSelectionTime):
 
     q = parseQuery1_1.parse(qString)
     q.body = makePlanQuery(q, plan)

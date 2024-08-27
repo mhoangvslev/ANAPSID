@@ -93,7 +93,7 @@ def t_ID(t):
     return t
 
 
-t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^\w+))?" 
+t_CONSTANT = r"(\"|\')[^\"\'\n\r]*(\"|\')((@[a-z][a-z]) | (\^\^<\S+>))?" 
 t_NUMBER = r"([0-9])+"
 t_VARIABLE = r"([\?]|[\$])([A-Z]|[a-z])\w*"
 t_LKEY = r"\{"
